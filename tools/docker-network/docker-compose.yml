@@ -38,7 +38,8 @@ services:
       --metrics.local=false
       --metrics.manaResearch=false
       --node.disablePlugins=clock
-      --node.enablePlugins=analysis-server,analysis-dashboard,prometheus,spammer,"webapi tools endpoint",activity,snapshot
+      --node.enablePlugins=analysis-server,analysis-dashboard,prometheus,spammer,"webapi tools endpoint",activity,snapshot,txstream
+      --txstream.bindAddress=:5000
       --prometheus.bindAddress=0.0.0.0:9311
       --prometheus.processMetrics=false
       --statement.writeManaThreshold=1.0
@@ -52,13 +53,14 @@ services:
       - ./builder/wait-for.sh:/run/wait-for.sh:ro
       - ./builder/peer-entry.sh:/run/entrypoint.sh:ro
     ports:
-      - "8080:8080/tcp" # web API
-      - "9000:9000/tcp" # analysis dashboard
+      - 8080:8080/tcp # web API
+      - 9000:9000/tcp # analysis dashboard
     expose:
       - 10895/tcp # FPC
       - 14626/tcp # Autopeering
       - 14666/tcp # Gossip
       - 1888/tcp # analysis server
+      - 5000/tcp # Transaction Stream
       - 6061/tcp # Pprof Profiling
       - 9311/tcp # prometheus
     networks:
@@ -72,10 +74,11 @@ services:
       /run/entrypoint.sh /go/bin/goshimmer
       --config=/run/secrets/goshimmer.config.json
       --database.directory=/tmp/mainnetdb
-      --node.enablePlugins=bootstrap,"webapi tools endpoint"
+      --node.enablePlugins=bootstrap,"webapi tools endpoint",txstream
       --messageLayer.snapshot.file=/run/secrets/goshimmer.message.snapshot.bin
       --messageLayer.snapshot.genesisNode=
       --node.disablePlugins=portcheck,clock
+      --txstream.bindAddress=:5000
       --mana.snapshotResetTime=true
       --statement.writeStatement=true
       --statement.writeManaThreshold=1.0
@@ -96,6 +99,7 @@ services:
       - 14626/tcp # Autopeering
       - 14666/tcp # Gossip
       - 1888/tcp # analysis server
+      - 5000/tcp # Transaction Stream
       - 6061/tcp # Pprof Profiling
       - 8080/tcp # web API
       - 8081/tcp # web API
@@ -114,12 +118,13 @@ services:
       --config=/run/secrets/goshimmer.config.json
       --database.directory=/tmp/mainnetdb
       --autopeering.seed=base58:3YX6e7AL28hHihZewKdq6CMkEYVsTJBLgRiprUNiNq5E
-      --node.enablePlugins=bootstrap,"webapi tools endpoint",faucet,activity
+      --node.enablePlugins=bootstrap,"webapi tools endpoint",faucet,activity,txstream
       --messageLayer.snapshot.file=/run/secrets/goshimmer.message.snapshot.bin
       --messageLayer.startSynced=true
       --faucet.seed=7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
       --messageLayer.snapshot.genesisNode=
       --node.disablePlugins=portcheck,clock
+      --txstream.bindAddress=:5000
       --mana.snapshotResetTime=true
       --statement.writeStatement=true
       --statement.writeManaThreshold=1.0
@@ -137,6 +142,7 @@ services:
       - 14626/tcp # Autopeering
       - 14666/tcp # Gossip
       - 1888/tcp # analysis server
+      - 5000/tcp # Transaction Stream
       - 6061/tcp # Pprof Profiling
       - 8080/tcp # web API
       - 8081/tcp # web API

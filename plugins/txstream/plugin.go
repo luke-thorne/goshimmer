@@ -39,7 +39,7 @@ func runPlugin(_ *node.Plugin) {
 	ledger := tangleledger.New()
 
 	bindAddress := Parameters.BindAddress
-	log.Debugf("starting TXStream plugin on %s", bindAddress)
+	log.Infof("starting TXStream plugin on %s", bindAddress)
 	err := daemon.BackgroundWorker("TXStream worker", func(shutdownSignal <-chan struct{}) {
 		err := server.Listen(ledger, bindAddress, log, shutdownSignal)
 		if err != nil {

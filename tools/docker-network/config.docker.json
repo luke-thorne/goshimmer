@@ -62,7 +62,7 @@
   },
   "node": {
     "disablePlugins": "portcheck",
-    "enablePlugins": []
+    "enablePlugins": ["txstream"]
   },
   "pow": {
     "difficulty": 2,
@@ -80,5 +80,8 @@
   },
   "faucet": {
     "powDifficulty": 12
+  },
+  "txstream": {
+    "bindAddress": ":5000"
   }
 }

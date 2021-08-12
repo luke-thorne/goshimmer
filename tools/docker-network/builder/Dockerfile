@@ -10,10 +10,13 @@ ENV GO111MODULE=on
 
 WORKDIR ${WORK_DIR}
 
-COPY . .
+# Only download modules if the mod files change
+COPY go.mod go.sum ./
 RUN apk update && apk add build-base
 RUN go mod download 
 RUN	go mod verify 
+
+COPY . .
 RUN go build -tags ${BUILD_TAGS} -ldflags '-w -s' -o ${BINARY_NAME} main.go pkged.go
 
 FROM golang:${GOLANG_IMAGE_TAG} as final
