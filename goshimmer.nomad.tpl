@@ -3,9 +3,7 @@ job "goshimmer" {
 
   priority  = 90
 
-  // TODO: Add distinct faucet, master, and replica tasks and monitoring group for grafana + prometheus
-  // TODO: Run Nomad as root on clients to allow for iptables stuff
-  group "testnet" {
+  group "leader" {
     ephemeral_disk {
       migrate = true
       sticky = true
@@ -13,8 +11,8 @@ job "goshimmer" {
 
     update {
       max_parallel      = 1
-      health_check      = "task_states"
-      min_healthy_time  = "15s"
+      health_check      = "checks"
+      min_healthy_time  = "10s"
       healthy_deadline  = "5m"
       progress_deadline = "10m"
       auto_revert       = true
@@ -35,38 +33,11 @@ job "goshimmer" {
         port "fpc" {}
         port "gossip" {}
         port "profiling" {}
-        port "leader_prometheus" {}
-        port "txstream" {}
-        
-        // Faucet
-        port "faucet_api" {}
-        port "faucet_autopeering" {}
-        port "faucet_fpc" {}
-        port "faucet_gossip" {}
-        port "faucet_prometheus" {}
-        port "faucet_txstream" {}
-        
-        // Replica
-        port "replica_api" {}
-        port "replica_autopeering" {}
-        port "replica_fpc" {}
-        port "replica_gossip" {}
-        port "replica_prometheus" {}
-        port "replica_txstream" {}
-        
-        // Grafana
-        port "grafana" {
-          to = "3000"
-        }
         port "prometheus" {}
-        
-        // drand
-        port "drand_leader" {}
-        port "drand_client" {}
-        port "drand_follower" {}
+        port "txstream" {}
     }
 
-    task "leader" {
+    task "node" {
       driver = "docker"
       leader = true
 
@@ -82,24 +53,12 @@ job "goshimmer" {
             "fpc",
             "gossip",
             "profiling",
-            "leader_prometheus",
+            "prometheus",
             "txstream",
         ]
-        // command =  "/goshimmer"
         args  = [
-            "--analysis.client.serverAddress=$${NOMAD_ADDR_analysis_api}",
-            "--analysis.dashboard.bindAddress=0.0.0.0:$${NOMAD_PORT_analysis_dashboard}",
-            "--analysis.server.bindAddress=0.0.0.0:$${NOMAD_PORT_analysis_api}",
-            "--autopeering.port=$${NOMAD_PORT_autopeering}",
-            "--dashboard.bindAddress=0.0.0.0:$${NOMAD_PORT_dashboard}",
-            "--fpc.bindAddress=0.0.0.0:$${NOMAD_PORT_fpc}",
-            "--gossip.port=$${NOMAD_PORT_gossip}",
-            "--profiling.bindAddress=0.0.0.0:$${NOMAD_PORT_profiling}",
-            "--prometheus.bindAddress=0.0.0.0:$${NOMAD_PORT_leader_prometheus}",
-            "--txstream.bindAddress=0.0.0.0:$${NOMAD_PORT_txstream}",
-            "--webapi.bindAddress=0.0.0.0:$${NOMAD_PORT_api}",
             "--autopeering.entryNodes=",
-            "--config=$CONFIG_PATH",
+            "--config=$${CONFIG_PATH}",
             "--database.directory=$${DB_PATH}",
             "--mana.enableResearchVectors=false",
             "--mana.snapshotResetTime=true",
@@ -109,7 +68,7 @@ job "goshimmer" {
             "--metrics.local=true",
             "--metrics.manaResearch=false",
             "--autopeering.seed=base58:8q491c3YWjbPwLmF2WD95YmCgh61j2kenCKHfGfByoWi",
-            "--node.disablePlugins=clock,portcheck",
+            "--node.disablePlugins=clock,portcheck,metrics",
             "--node.enablePlugins=analysis-server,analysis-dashboard,prometheus,spammer,activity,snapshot,txstream",
             "--prometheus.processMetrics=false",
             "--statement.writeManaThreshold=1.0",
@@ -130,10 +89,107 @@ job "goshimmer" {
         mode        = "file"
       }
       
-      artifact {
-        source      = "https://github.com/iotaledger/goshimmer/raw/develop/tools/docker-network/config.docker.json"
+      template {
         destination = "$${NOMAD_TASK_DIR}/config.json"
-        mode        = "file"
+        data = <<EOF
+{
+  "analysis": {
+    "client": {
+      "serverAddress": "{{ env "NOMAD_ADDR_analysis_api" }}"
+    },
+    "server": {
+      "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_analysis_api" }}"
+    },
+    "dashboard": {
+      "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_analysis_dashboard" }}",
+      "dev": false
+    }
+  },
+  "autoPeering": {
+    "entryNodes": [],
+    "port": "{{ env "NOMAD_PORT_autopeering" }}"
+  },
+  "dashboard": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_dashboard" }}",
+    "dev": false,
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    }
+  },
+  "database": {
+    "directory": "mainnetdb"
+  },
+  "drng": {
+    "custom": {
+      "instanceID": 111,
+      "threshold": 3,
+      "distributedPubKey": "",
+      "committeeMembers": [
+        "EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP"
+      ]
+    }
+  },
+  "fpc": {
+    "drngInstanceID": 111,
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_fpc" }}"
+  },
+  "gossip": {
+    "port": "{{ env "NOMAD_PORT_gossip" }}"
+  },
+  "logger": {
+    "level": "debug",
+    "disableCaller": false,
+    "disableStacktrace": false,
+    "encoding": "console",
+    "outputPaths": [
+      "stdout"
+    ],
+    "disableEvents": true
+  },
+  "metrics": {
+    "manaUpdateInterval": "5s"
+  },
+  "prometheus": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_prometheus" }}"
+  },
+  "profiling": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_profiling" }}"
+  },
+  "txstream": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_txstream" }}"
+  },
+  "network": {
+    "bindAddress": "0.0.0.0",
+    "externalAddress": "auto"
+  },
+  "node": {
+    "disablePlugins": "portcheck",
+    "enablePlugins": []
+  },
+  "pow": {
+    "difficulty": 2,
+    "numThreads": 1,
+    "timeout": "10s",
+    "parentsRefreshInterval": "300ms"
+  },
+  "webAPI": {
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    },
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_api" }}"
+  },
+  "faucet": {
+    "powDifficulty": 12
+  },
+  "txstream": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_txstream" }}"
+  }
+}
+EOF
       }
 
       service {
@@ -156,8 +212,8 @@ job "goshimmer" {
         check {
           type     = "http"
           port     = "api"
-          path     = "healthz"
-          interval = "10s"
+          path     = "/healthz"
+          interval = "2s"
           timeout  = "2s"
         }
       }
@@ -193,9 +249,9 @@ job "goshimmer" {
       }
 
       service {
-        tags = ["leader_prometheus"]
+        tags = ["prometheus"]
 
-        port = "leader_prometheus"
+        port = "prometheus"
       }
 
       service {
@@ -214,12 +270,47 @@ job "goshimmer" {
       }
 
       resources {
-        memory = 512
-        cpu = 2500
+        memory = 4096
+        cpu = 3072
       }
     }
+  }
 
-    task "faucet" {
+  group "faucet" {
+    ephemeral_disk {
+      migrate = true
+      sticky = true
+    }
+
+    update {
+      max_parallel      = 1
+      health_check      = "checks"
+      min_healthy_time  = "10s"
+      healthy_deadline  = "5m"
+      progress_deadline = "10m"
+      auto_revert       = true
+      auto_promote      = true
+      canary            = 1
+      stagger           = "30s"
+    }
+
+    network {
+        mode = "host"
+
+        port "analysis_api" {}
+        port "analysis_dashboard" {}
+        port "api" {}
+        port "autopeering" {}
+        port "dashboard" {}
+        port "fpc" {}
+        port "gossip" {}
+        port "profiling" {}
+        port "prometheus" {}
+        port "txstream" {}
+    }
+
+
+    task "node" {
       driver = "docker"
 
       config {
@@ -227,23 +318,15 @@ job "goshimmer" {
         image = "${artifact.image}:${artifact.tag}"
         command =  "goshimmer"
         ports = [
-            "faucet_api",
-            "faucet_autopeering",
-            "faucet_fpc",
-            "faucet_gossip",
-            "faucet_prometheus",
-            "faucet_txstream",
+            "api",
+            "autopeering",
+            "fpc",
+            "gossip",
+            "prometheus",
+            "txstream",
         ]
         args  = [
-            "--analysis.client.serverAddress=$${NOMAD_ADDR_analysis_api}",
-            "--autopeering.port=$${NOMAD_PORT_faucet_autopeering}",
-            "--fpc.bindAddress=0.0.0.0:$${NOMAD_PORT_faucet_fpc}",
-            "--gossip.port=$${NOMAD_PORT_faucet_gossip}",
-            "--prometheus.bindAddress=0.0.0.0:$${NOMAD_PORT_faucet_prometheus}",
-            "--webapi.bindAddress=0.0.0.0:$${NOMAD_PORT_faucet_api}",
-            "--txstream.bindAddress=0.0.0.0:$${NOMAD_PORT_faucet_txstream}",
-            "--autopeering.entryNodes=EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP@$${NOMAD_ADDR_autopeering}",
-            "--config=$CONFIG_PATH",
+            "--config=$${CONFIG_PATH}",
             "--database.directory=$${DB_PATH}",
             "--messageLayer.snapshot.file=$${SNAPSHOT_PATH}",
             "--messageLayer.startSynced=true",
@@ -251,7 +334,7 @@ job "goshimmer" {
             "--mana.snapshotResetTime=true",
             "--faucet.seed=7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih",
             "--autopeering.seed=base58:3YX6e7AL28hHihZewKdq6CMkEYVsTJBLgRiprUNiNq5E",
-            "--node.disablePlugins=clock,portcheck",
+            "--node.disablePlugins=clock,portcheck,metrics",
             "--node.enablePlugins=bootstrap,prometheus,faucet,activity,txstream",
             "--webapi.exportPath=$${NOMAD_TASK_DIR}/tmp/",
         ]
@@ -269,22 +352,115 @@ job "goshimmer" {
         mode        = "file"
       }
       
-      artifact {
-        source      = "https://github.com/iotaledger/goshimmer/raw/develop/tools/docker-network/config.docker.json"
+      template {
         destination = "$${NOMAD_TASK_DIR}/config.json"
-        mode        = "file"
+        data = <<EOF
+{
+  "analysis": {
+    "client": {
+      "serverAddress": "{{ range service "goshimmer-leader-node" }}{{ if in .Tags "analysis_api" }}{{ .Address }}:{{ .Port }}{{ end }}{{ end }}"
+    },
+    "server": {
+      "bindAddress": "0.0.0.0:1888"
+    },
+    "dashboard": {
+      "bindAddress": "0.0.0.0:9000",
+      "dev": false
+    }
+  },
+  "autoPeering": {
+    "entryNodes": [
+      "EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP@{{ range service "goshimmer-leader-node" }}{{ if in .Tags "autopeering" }}{{ .Address }}:{{ .Port }}{{ end }}{{ end }}"
+    ],
+    "port": "{{ env "NOMAD_PORT_autopeering" }}"
+  },
+  "dashboard": {
+    "bindAddress": "0.0.0.0:8081",
+    "dev": false,
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    }
+  },
+  "database": {
+    "directory": "mainnetdb"
+  },
+  "drng": {
+    "custom": {
+      "instanceID": 111,
+      "threshold": 3,
+      "distributedPubKey": "",
+      "committeeMembers": [
+        "EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP"
+      ]
+    }
+  },
+  "fpc": {
+    "drngInstanceID": 111,
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_fpc" }}"
+  },
+  "gossip": {
+    "port": "{{ env "NOMAD_PORT_gossip" }}"
+  },
+  "logger": {
+    "level": "debug",
+    "disableCaller": false,
+    "disableStacktrace": false,
+    "encoding": "console",
+    "outputPaths": [
+      "stdout"
+    ],
+    "disableEvents": true
+  },
+  "metrics": {
+    "manaUpdateInterval": "5s"
+  },
+  "prometheus": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_prometheus" }}"
+  },
+  "network": {
+    "bindAddress": "0.0.0.0",
+    "externalAddress": "auto"
+  },
+  "node": {
+    "disablePlugins": "portcheck",
+    "enablePlugins": []
+  },
+  "pow": {
+    "difficulty": 2,
+    "numThreads": 1,
+    "timeout": "10s",
+    "parentsRefreshInterval": "300ms"
+  },
+  "webAPI": {
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    },
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_api" }}"
+  },
+  "faucet": {
+    "powDifficulty": 12
+  },
+  "txstream": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_txstream" }}"
+  }
+}
+EOF
       }
 
       service {
         tags = ["api"]
 
-        port = "faucet_api"
+        port = "api"
 
         check {
           type     = "http"
-          port     = "faucet_api"
-          path     = "healthz"
-          interval = "10s"
+          port     = "api"
+          path     = "/healthz"
+          interval = "2s"
           timeout  = "2s"
         }
       }
@@ -292,31 +468,31 @@ job "goshimmer" {
       service {
         tags = ["autopeering"]
 
-        port = "faucet_autopeering"
+        port = "autopeering"
       }
 
       service {
         tags = ["fpc"]
 
-        port = "faucet_fpc"
+        port = "fpc"
       }
 
       service {
         tags = ["gossip"]
 
-        port = "faucet_gossip"
+        port = "gossip"
       }
 
       service {
         tags = ["prometheus"]
 
-        port = "faucet_prometheus"
+        port = "prometheus"
       }
       
       service {
         tags = ["txstream"]
 
-        port = "faucet_txstream"
+        port = "txstream"
       }
 
       env {
@@ -326,12 +502,46 @@ job "goshimmer" {
       }
 
       resources {
-        memory = 512
-        cpu = 2500
+        memory = 4096
+        cpu = 3072
       }
     }
+  }
 
-    task "replica" {
+  group "replica" {
+    ephemeral_disk {
+      migrate = true
+      sticky = true
+    }
+
+    update {
+      max_parallel      = 1
+      health_check      = "checks"
+      min_healthy_time  = "10s"
+      healthy_deadline  = "5m"
+      progress_deadline = "10m"
+      auto_revert       = true
+      auto_promote      = true
+      canary            = 1
+      stagger           = "30s"
+    }
+
+    network {
+        mode = "host"
+
+        port "analysis_api" {}
+        port "analysis_dashboard" {}
+        port "api" {}
+        port "autopeering" {}
+        port "dashboard" {}
+        port "fpc" {}
+        port "gossip" {}
+        port "profiling" {}
+        port "prometheus" {}
+        port "txstream" {}
+    }
+
+    task "node" {
       driver = "docker"
 
       config {
@@ -339,28 +549,20 @@ job "goshimmer" {
         image = "${artifact.image}:${artifact.tag}"
         command =  "goshimmer"
         ports = [
-            "replica_api",
-            "replica_autopeering",
-            "replica_fpc",
-            "replica_gossip",
-            "replica_prometheus",
-            "replica_txstream",
+            "api",
+            "autopeering",
+            "fpc",
+            "gossip",
+            "prometheus",
+            "txstream",
         ]
         args  = [
-            "--analysis.client.serverAddress=$${NOMAD_ADDR_analysis_api}",
-            "--autopeering.port=$${NOMAD_PORT_replica_autopeering}",
-            "--fpc.bindAddress=0.0.0.0:$${NOMAD_PORT_replica_fpc}",
-            "--gossip.port=$${NOMAD_PORT_replica_gossip}",
-            "--webapi.bindAddress=0.0.0.0:$${NOMAD_PORT_replica_api}",
-            "--prometheus.bindAddress=0.0.0.0:$${NOMAD_PORT_replica_prometheus}",
-            "--txstream.bindAddress=0.0.0.0:$${NOMAD_PORT_replica_txstream}",
-            "--autopeering.entryNodes=EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP@$${NOMAD_ADDR_autopeering}",
-            "--config=$CONFIG_PATH",
+            "--config=$${CONFIG_PATH}",
             "--database.directory=$${DB_PATH}",
             "--messageLayer.snapshot.file=$${SNAPSHOT_PATH}",
             "--messageLayer.snapshot.genesisNode=",
             "--mana.snapshotResetTime=true",
-            "--node.disablePlugins=clock,portcheck",
+            "--node.disablePlugins=clock,portcheck,metrics",
             "--node.enablePlugins=bootstrap,prometheus,activity,txstream",
             "--statement.writeStatement=true",
             "--statement.writeManaThreshold=1.0",
@@ -379,23 +581,116 @@ job "goshimmer" {
         destination = "$${NOMAD_TASK_DIR}/snapshot.bin"
         mode        = "file"
       }
-      
-      artifact {
-        source      = "https://github.com/iotaledger/goshimmer/raw/develop/tools/docker-network/config.docker.json"
-        destination = "$${NOMAD_TASK_DIR}/config.json"
-        mode        = "file"
-      }
 
+      template {
+        destination = "$${NOMAD_TASK_DIR}/config.json"
+        data = <<EOF
+{
+  "analysis": {
+    "client": {
+      "serverAddress": "{{ range service "goshimmer-leader-node" }}{{ if in .Tags "analysis_api" }}{{ .Address }}:{{ .Port }}{{ end }}{{ end }}"
+    },
+    "server": {
+      "bindAddress": "0.0.0.0:1888"
+    },
+    "dashboard": {
+      "bindAddress": "0.0.0.0:9000",
+      "dev": false
+    }
+  },
+  "autoPeering": {
+    "entryNodes": [
+      "EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP@{{ range service "goshimmer-leader-node" }}{{ if in .Tags "autopeering" }}{{ .Address }}:{{ .Port }}{{ end }}{{ end }}"
+    ],
+    "port": "{{ env "NOMAD_PORT_autopeering" }}"
+  },
+  "dashboard": {
+    "bindAddress": "0.0.0.0:8081",
+    "dev": false,
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    }
+  },
+  "database": {
+    "directory": "mainnetdb"
+  },
+  "drng": {
+    "custom": {
+      "instanceID": 111,
+      "threshold": 3,
+      "distributedPubKey": "",
+      "committeeMembers": [
+        "EYsaGXnUVA9aTYL9FwYEvoQ8d1HCJveQVL7vogu6pqCP"
+      ]
+    }
+  },
+  "fpc": {
+    "drngInstanceID": 111,
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_fpc" }}"
+  },
+  "gossip": {
+    "port": "{{ env "NOMAD_PORT_gossip" }}"
+  },
+  "logger": {
+    "level": "debug",
+    "disableCaller": false,
+    "disableStacktrace": false,
+    "encoding": "console",
+    "outputPaths": [
+      "stdout"
+    ],
+    "disableEvents": true
+  },
+  "metrics": {
+    "manaUpdateInterval": "5s"
+  },
+  "prometheus": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_prometheus" }}"
+  },
+  "network": {
+    "bindAddress": "0.0.0.0",
+    "externalAddress": "auto"
+  },
+  "node": {
+    "disablePlugins": "portcheck",
+    "enablePlugins": []
+  },
+  "pow": {
+    "difficulty": 2,
+    "numThreads": 1,
+    "timeout": "10s",
+    "parentsRefreshInterval": "300ms"
+  },
+  "webAPI": {
+    "basicAuth": {
+      "enabled": false,
+      "username": "goshimmer",
+      "password": "goshimmer"
+    },
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_api" }}"
+  },
+  "faucet": {
+    "powDifficulty": 12
+  },
+  "txstream": {
+    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_txstream" }}"
+  }
+}
+EOF
+      }
+      
       service {
         tags = ["api"]
 
-        port = "replica_api"
+        port = "api"
 
         check {
           type     = "http"
           port     = "api"
-          path     = "healthz"
-          interval = "10s"
+          path     = "/healthz"
+          interval = "2s"
           timeout  = "2s"
         }
       }
@@ -403,31 +698,31 @@ job "goshimmer" {
       service {
         tags = ["autopeering"]
 
-        port = "replica_autopeering"
+        port = "autopeering"
       }
 
       service {
         tags = ["fpc"]
 
-        port = "replica_fpc"
+        port = "fpc"
       }
 
       service {
         tags = ["gossip"]
 
-        port = "replica_gossip"
+        port = "gossip"
       }
 
       service {
         tags = ["prometheus"]
 
-        port = "replica_prometheus"
+        port = "prometheus"
       }
 
       service {
         tags = ["txstream"]
 
-        port = "replica_txstream"
+        port = "txstream"
       }
 
       env {
@@ -437,9 +732,20 @@ job "goshimmer" {
       }
 
       resources {
-        memory = 512
-        cpu = 2500
+        memory = 4096
+        cpu = 3072
       }
+    }
+  }
+
+  group "monitoring" {
+    network {
+        mode = "host"
+
+        port "grafana" {
+          to = "3000"
+        }
+        port "prometheus" {}
     }
 
     task "grafana" {
