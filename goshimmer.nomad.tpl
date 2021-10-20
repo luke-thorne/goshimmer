@@ -24,17 +24,36 @@ job "goshimmer" {
     network {
         mode = "host"
 
-        // Leader
-        port "analysis_api" {}
-        port "analysis_dashboard" {}
-        port "api" {}
-        port "autopeering" {}
-        port "dashboard" {}
-        port "fpc" {}
-        port "gossip" {}
-        port "profiling" {}
-        port "prometheus" {}
-        port "txstream" {}
+        port "analysis_api" {
+          host_network = "private"
+        }
+        port "analysis_dashboard" {
+          host_network = "private"
+        }
+        port "api" {
+          host_network = "private"
+        }
+        port "autopeering" {
+          host_network = "private"
+        }
+        port "dashboard" {
+          host_network = "private"
+        }
+        port "fpc" {
+          host_network = "private"
+        }
+        port "gossip" {
+          host_network = "private"
+        }
+        port "profiling" {
+          host_network = "private"
+        }
+        port "prometheus" {
+          host_network = "private"
+        }
+        port "txstream" {
+          host_network = "private"
+        }
     }
 
     task "node" {
@@ -184,9 +203,6 @@ job "goshimmer" {
   },
   "faucet": {
     "powDifficulty": 12
-  },
-  "txstream": {
-    "bindAddress": "0.0.0.0:{{ env "NOMAD_PORT_txstream" }}"
   }
 }
 EOF
@@ -297,16 +313,36 @@ EOF
     network {
         mode = "host"
 
-        port "analysis_api" {}
-        port "analysis_dashboard" {}
-        port "api" {}
-        port "autopeering" {}
-        port "dashboard" {}
-        port "fpc" {}
-        port "gossip" {}
-        port "profiling" {}
-        port "prometheus" {}
-        port "txstream" {}
+        port "analysis_api" {
+          host_network = "private"
+        }
+        port "analysis_dashboard" {
+          host_network = "private"
+        }
+        port "api" {
+          host_network = "private"
+        }
+        port "autopeering" {
+          host_network = "private"
+        }
+        port "dashboard" {
+          host_network = "private"
+        }
+        port "fpc" {
+          host_network = "private"
+        }
+        port "gossip" {
+          host_network = "private"
+        }
+        port "profiling" {
+          host_network = "private"
+        }
+        port "prometheus" {
+          host_network = "private"
+        }
+        port "txstream" {
+          host_network = "private"
+        }
     }
 
 
@@ -529,16 +565,36 @@ EOF
     network {
         mode = "host"
 
-        port "analysis_api" {}
-        port "analysis_dashboard" {}
-        port "api" {}
-        port "autopeering" {}
-        port "dashboard" {}
-        port "fpc" {}
-        port "gossip" {}
-        port "profiling" {}
-        port "prometheus" {}
-        port "txstream" {}
+        port "analysis_api" {
+          host_network = "private"
+        }
+        port "analysis_dashboard" {
+          host_network = "private"
+        }
+        port "api" {
+          host_network = "private"
+        }
+        port "autopeering" {
+          host_network = "private"
+        }
+        port "dashboard" {
+          host_network = "private"
+        }
+        port "fpc" {
+          host_network = "private"
+        }
+        port "gossip" {
+          host_network = "private"
+        }
+        port "profiling" {
+          host_network = "private"
+        }
+        port "prometheus" {
+          host_network = "private"
+        }
+        port "txstream" {
+          host_network = "private"
+        }
     }
 
     task "node" {
@@ -743,9 +799,12 @@ EOF
         mode = "host"
 
         port "grafana" {
+          host_network = "private"
           to = "3000"
         }
-        port "prometheus" {}
+        port "prometheus" {
+          host_network = "private"
+        }
     }
 
     task "grafana" {
