@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/daemon"
+	"github.com/iotaledger/hive.go/datastructure/walker"
 	"github.com/iotaledger/hive.go/events"
 	"github.com/iotaledger/hive.go/identity"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -84,6 +85,18 @@ func init() {
 	}))
 }
 
+func retrieveTips() (tips []tangle.MessageID) {
+	deps.Tangle.Utils.WalkMessageID(func(messageID tangle.MessageID, walker *walker.Walker) {
+		if !deps.Tangle.Storage.Approvers(messageID).Consume(func(approver *tangle.Approver) {
+			walker.Push(approver.ApproverMessageID())
+		}) {
+			tips = append(tips, messageID)
+		}
+	}, tangle.MessageIDs{tangle.EmptyMessageID})
+
+	return tips
+}
+
 func configure(plugin *node.Plugin) {
 	deps.Tangle.Events.Error.Attach(events.NewClosure(func(err error) {
 		plugin.LogError(err)
@@ -155,6 +168,8 @@ func configure(plugin *node.Plugin) {
 	fcob.LocallyFinalizedThreshold = 2 * Parameters.FCOB.QuarantineTime
 
 	configureApprovalWeight()
+
+	deps.Tangle.TipManager.Set(retrieveTips()...)
 }
 
 func run(*node.Plugin) {
@@ -181,8 +196,8 @@ func newTangle(deps tangledeps) *tangle.Tangle {
 		tangle.Consensus(deps.ConsensusMechanism),
 		tangle.GenesisNode(Parameters.Snapshot.GenesisNode),
 		tangle.SchedulerConfig(tangle.SchedulerParams{
-			MaxBufferSize: SchedulerParameters.MaxBufferSize,
-			Rate:          schedulerRate(SchedulerParameters.Rate),
+			MaxBufferSize:               SchedulerParameters.MaxBufferSize,
+			Rate:                        schedulerRate(SchedulerParameters.Rate),
 			AccessManaRetrieveFunc:      accessManaRetriever,
 			TotalAccessManaRetrieveFunc: totalAccessManaRetriever,
 		}),
