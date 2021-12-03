@@ -169,6 +169,7 @@ func configure(plugin *node.Plugin) {
 
 	configureApprovalWeight()
 
+	plugin.LogInfo("Recovering tips from the Tangle. This can take a while depending on the size of the Tangle.")
 	deps.Tangle.TipManager.Set(retrieveTips()...)
 }
 
