@@ -7,6 +7,8 @@ ARG IMAGE_TAG=1.17-buster
 FROM golang:${IMAGE_TAG} AS build
 
 ARG BUILD_TAGS=rocksdb,builtin_static
+# Download and include snapshot into resulting image by default.
+ARG DOWNLOAD_SNAPSHOT=1
 
 # Ensure ca-certficates are up to date
 RUN update-ca-certificates
@@ -35,7 +37,13 @@ RUN GOOS=linux GOARCH=amd64 go build \
     -ldflags='-w -s' \
     -o /go/bin/goshimmer
 
-RUN wget -O /tmp/snapshot.bin https://dbfiles-goshimmer.s3.eu-central-1.amazonaws.com/snapshots/nectar/snapshot-latest.bin
+# Enable building the image without downloading the snapshot.
+# If built with dummy snapshot then a snapshot needs to be mounted into the resulting image.
+RUN if [ $DOWNLOAD_SNAPSHOT -gt 0 ]; then \
+    wget -O /tmp/snapshot.bin https://dbfiles-goshimmer.s3.eu-central-1.amazonaws.com/snapshots/nectar/snapshot-latest.bin ;  \
+    else  \
+    touch /tmp/snapshot.bin ; \
+    fi
 
 ############################
 # Image

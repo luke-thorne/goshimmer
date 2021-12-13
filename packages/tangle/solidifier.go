@@ -12,7 +12,7 @@ import (
 const minParentsTimeDifference = 0 * time.Second
 
 // maxParentsTimeDifference defines the biggest allowed time difference between a child Message and its parents.
-const maxParentsTimeDifference = 30 * time.Minute
+const maxParentsTimeDifference = 999999 * time.Hour
 
 // region Solidifier ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +59,7 @@ func (s *Solidifier) checkMessageSolidity(message *Message, messageMetadata *Mes
 		if !messageMetadata.SetInvalid(true) {
 			return
 		}
-		s.tangle.Events.MessageInvalid.Trigger(message.ID())
+		s.tangle.Events.MessageInvalid.Trigger(&MessageInvalidEvent{MessageID: message.ID(), Error: ErrParentsInvalid})
 		return
 	}
 
